@@ -1,0 +1,38 @@
+<div>
+  Detail Matakuliah :
+  <br />
+  ID Matkul :
+  {{idMatkul}}
+  <br />
+  Nama Matakuliah :
+  {{namaMatkul}}
+  <br />
+  Nama Dosen :
+  {{namaDosen}}
+  <br />
+  Tanggal / Jam :
+  {{pertemuan}}
+  <br />
+  <br />
+  Tambah Pertemuan :
+  <br />
+  <form method="POST" action="/addPertemuan/{{idMatkul}}">
+    <label for="birthday">Tanggal Pertemuan :</label>
+    <input type="date" id="birthday" name="tanggal" />
+    <br />
+    <label for="birthday">Jam Pertemuan :</label>
+    <input type="time" id="birthday" name="waktu" />
+    <br />
+    <button type="submit" class="btn btn-primary">Add</button>
+  </form>
+
+  <br />
+  <p>Hapus Matakuliah</p>
+  <form method="POST" action="/delete-matkul-dosen/{{idMatkul}}">
+    {{! <div class="form-group">
+      <label for="emailInput">ID Matakuliah</label>
+      <input name="idMatkul" type="text" class="form-control" id="emailInput" placeholder="ID Matakuliah" />
+    </div> }}
+    <button type="submit" class="btn btn-primary">Hapus</button>
+  </form>
+</div>

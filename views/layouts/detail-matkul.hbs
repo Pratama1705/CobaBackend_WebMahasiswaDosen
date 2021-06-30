@@ -1,0 +1,33 @@
+<div>
+  Detail Matakuliah :
+  <br />
+  ID Matkul :
+  {{idMatkul}}
+  <br />
+  Nama Matakuliah :
+  {{namaMatkul}}
+  <br />
+  Nama Dosen :
+  {{namaDosen}}
+  <br />
+  Tanggal / Jam :
+  {{pertemuan}}
+  <br>
+  QR Code Absen :
+  <img src="{{qrMatkul}}" alt="QR CODE IMAGE">
+</div>
+
+<br>
+<form method="POST" action="/absen/{{idMatkul}}">
+  <label for="">Tidak bisa scan QR? Masukan Kode disini : </label>
+  <br />
+  <input type="text" name="kode_matkul_qr" id="">
+  <button type="submit" class="btn btn-primary">Absen!</button>
+</form>
+
+<br />
+<form method="POST" action="/delete-matkul/{{idMatkul}}">
+  <label for="">Hapus Matakuliah Ini : </label>
+  <br />
+  <button type="submit" class="btn btn-primary">Hapus</button>
+</form>

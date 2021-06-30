@@ -4,14 +4,17 @@ const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const qr = require("qrcode");
 const Registrasi = require("./models/registrasi");
 const Dosen = require("./models/dosen");
+const { hasUncaughtExceptionCaptureCallback } = require("process");
 
 // KONEKSI KE MONGODB
 mongoose
   .connect("mongodb+srv://LatihanDB:latihandb@pratama.wyglh.mongodb.net/myFirstDatabase?retryWrites=true&w=majority", {
     useUnifiedTopology: true,
     useNewUrlParser: true,
+    autoIndex: false,
   })
   .then(() => console.log("DB Connected"))
   .catch((err) => console.log(`DB Connection Error : ${err.message}`));
@@ -553,6 +556,7 @@ app.post("/add-matkul", (req, res) => {
                   idMatkul: result[i].mataKuliah[j].idMatkul,
                   namaMatkul: result[i].mataKuliah[j].namaMatkul,
                   namaDosen: result[i].mataKuliah[j].namaDosen,
+                  matkulQR: `${result[i].mataKuliah[j].idMatkul}-${Math.random()}`,
                 });
                 console.log(result_2);
                 result_2.save((err) => {
@@ -641,12 +645,21 @@ app.get("/detail-matkul-dosen/:idMatkul", (req, res) => {
     for (let i = 0; i < result.length; i++) {
       result[i].mataKuliah.find((e) => {
         if (e.idMatkul === idMatkul) {
-          res.render("./layouts/detail-matkul-dosen", {
-            idMatkul: e.idMatkul,
-            namaMatkul: e.namaMatkul,
-            namaDosen: e.namaDosen,
-            pertemuan: e.pertemuan[0].tanggal + " / " + e.pertemuan[0].waktu,
-          });
+          if (e.pertemuan.length == 0) {
+            res.render("./layouts/detail-matkul-dosen", {
+              idMatkul: e.idMatkul,
+              namaMatkul: e.namaMatkul,
+              namaDosen: e.namaDosen,
+              pertemuan: "-",
+            });
+          } else {
+            res.render("./layouts/detail-matkul-dosen", {
+              idMatkul: e.idMatkul,
+              namaMatkul: e.namaMatkul,
+              namaDosen: e.namaDosen,
+              pertemuan: e.pertemuan[0].tanggal + " / " + e.pertemuan[0].waktu,
+            });
+          }
         }
       });
     }
@@ -663,28 +676,39 @@ app.get("/detail-matkul/:idMatkul", (req, res) => {
     for (let i = 0; i < result.length; i++) {
       result[i].mataKuliah.find((e) => {
         if (e.idMatkul === idMatkul) {
-          res.render("./layouts/detail-matkul", {
-            idMatkul: e.idMatkul,
-            namaMatkul: e.namaMatkul,
-            namaDosen: e.namaDosen,
-            pertemuan: Dosen.find({ mataKuliah: { $elemMatch: { idMatkul } } }, (err, result) => {
-              if (err) {
-                console.log("ERROR GAN!!");
-                res.status(500);
-              }
-              for (let i = 0; i < result.length; i++) {
-                for (let j = 0; j < result[i].mataKuliah.length; j++) {
-                  if (result[i].mataKuliah[j].idMatkul == idMatkul) {
-                    tangJam = result[i].mataKuliah[j].pertemuan[0];
-                    pertemuan = tangJam.tanggal + " / " + tangJam.waktu;
-                    // console.log(pertemuan);
-                    // return pertemuan;
+          qr.toDataURL(e.matkulQR, (err, result) => {
+            if (err) {
+              console.log("ERROR");
+              res.status(500);
+            }
+            res.render("./layouts/detail-matkul", {
+              idMatkul: e.idMatkul,
+              namaMatkul: e.namaMatkul,
+              namaDosen: e.namaDosen,
+              qrMatkul: result,
+              pertemuan: Dosen.find({ mataKuliah: { $elemMatch: { idMatkul } } }, (err, result) => {
+                if (err) {
+                  console.log("ERROR GAN!!");
+                  res.status(500);
+                }
+                for (let i = 0; i < result.length; i++) {
+                  for (let j = 0; j < result[i].mataKuliah.length; j++) {
+                    if (result[i].mataKuliah[j].idMatkul == idMatkul) {
+                      console.log(result[i].mataKuliah[j].pertemuan.length);
+                      if (result[i].mataKuliah[j].pertemuan.length == 0) {
+                        pertemuan = "-";
+                        return pertemuan;
+                      } else {
+                        tangJam = result[i].mataKuliah[j].pertemuan[0];
+                        pertemuan = tangJam.tanggal + " / " + tangJam.waktu;
+                      }
+                    }
                   }
                 }
-              }
-              console.log(pertemuan);
-              return JSON.stringify(pertemuan);
-            })
+                console.log(JSON.stringify(pertemuan));
+                return JSON.stringify(pertemuan);
+              }),
+            });
           });
         }
       });
@@ -706,7 +730,8 @@ app.post("/addPertemuan/:idMatkul", (req, res) => {
       if (result.mataKuliah[i].idMatkul == idMatkul) {
         result.mataKuliah[i].pertemuan.unshift({
           tanggal: tanggal,
-          waktu : waktu
+          waktu: waktu,
+          daftarHadir: [],
         });
         console.log(result.mataKuliah[i].pertemuan);
         result.mataKuliah[i].pertemuan.splice(3, 1);
@@ -723,6 +748,55 @@ app.post("/addPertemuan/:idMatkul", (req, res) => {
           console.log(result.mataKuliah[i]);
           res.status(200);
         });
+      }
+    }
+  });
+});
+// ------------------------------------------------ABSEN--------------------------------------------------------------------------------
+app.post("/absen/:idMatkul", (req, res) => {
+  const { kode_matkul_qr } = req.body;
+  const { idMatkul } = req.params;
+  const { email, firstName, lastName } = req.user;
+
+  console.log(email);
+  Registrasi.find({ email }, (err, result) => {
+    if (err) {
+      console.log("ERRORRR 222");
+      res.status(500);
+    }
+    for (let i = 0; i < result[0].mataKuliah.length; i++) {
+      if (result[0].mataKuliah[i].idMatkul == idMatkul) {
+        if (result[0].mataKuliah[i].matkulQR == kode_matkul_qr) {
+          Dosen.find({ mataKuliah: { $elemMatch: { idMatkul } } }, (err, result) => {
+            if (err) {
+              console.log("ERR OO RRRR");
+              res.status(500);
+            }
+            for (let i = 0; i < result[0].mataKuliah.length; i++) {
+              if ((result[0].mataKuliah[i].idMatkul = idMatkul)) {
+                result[0].mataKuliah[i].pertemuan[0].daftarHadir.push({
+                  email: email,
+                  nama: `${firstName} ${lastName}`,
+                  keterangan: "HADIR",
+                });
+                console.log(result[0].mataKuliah[i].pertemuan[0]);
+                result[0].markModified("mataKuliah");
+                result[0].save((err) => {
+                  if (err) {
+                    console.log("GAGAL MENAMBAH ABSEN!");
+                    res.status(500);
+                  }
+                  res.render("./layouts/protected", {
+                    message: "Berhasil Mengabsen!",
+                    messageClass: "alert-success",
+                  });
+                  res.status(200);
+                });
+                break;
+              }
+            }
+          });
+        }
       }
     }
   });
@@ -756,4 +830,3 @@ const port = 3000;
 app.listen(port, () => {
   console.log(`Server is listening at http://localhost:${port}`);
 });
-console.log("AKU GANTENG!!");
